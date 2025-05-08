@@ -1,0 +1,210 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { fetchUsers, fetchColumns } from "@/lib/api"
+import { useToast } from "@/components/ui/use-toast"
+
+export function TaskForm({ task, onSubmit, isSubmitting }) {
+  const [title, setTitle] = useState(task?.title || "")
+  const [description, setDescription] = useState(task?.description || "")
+  const [status, setStatus] = useState(task?.status || "todo")
+  const [priority, setPriority] = useState(task?.priority || "medium")
+  const [columnId, setColumnId] = useState(task?.column_id?.toString() || "")
+  const [assignedUserId, setAssignedUserId] = useState(task?.assigned_user_id?.toString() || "")
+  const [tags, setTags] = useState(task?.tags ? task.tags.join(", ") : "")
+
+  const [users, setUsers] = useState([])
+  const [columns, setColumns] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  const { toast } = useToast()
+
+  useEffect(() => {
+    const loadFormData = async () => {
+      try {
+        const [usersData, columnsData] = await Promise.all([
+          fetchUsers(),
+          fetchColumns(task?.column_id ? undefined : null),
+        ])
+
+        setUsers(usersData)
+        setColumns(columnsData)
+      } catch (error) {
+        toast({
+          title: "Hata",
+          description: "Form verileri yüklenirken bir hata oluştu.",
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    loadFormData()
+  }, [toast, task?.column_id])
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+
+    if (!title.trim()) {
+      toast({
+        title: "Hata",
+        description: "Görev başlığı boş olamaz.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Etiketleri diziye dönüştür
+    const tagArray = tags.trim() ? tags.split(",").map((tag) => tag.trim()) : []
+
+    onSubmit({
+      title,
+      description,
+      status,
+      priority,
+      column_id: columnId ? Number.parseInt(columnId) : null,
+      assigned_user_id: assignedUserId ? Number.parseInt(assignedUserId) : null,
+      tags: tagArray,
+    })
+  }
+
+  if (isLoading) {
+    return (
+      <div className="animate-pulse space-y-4">
+        <div className="h-10 bg-gray-700 rounded-md"></div>
+        <div className="h-24 bg-gray-700 rounded-md"></div>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="h-10 bg-gray-700 rounded-md"></div>
+          <div className="h-10 bg-gray-700 rounded-md"></div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <form id="task-form" onSubmit={handleSubmit} className="space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="title" className="text-white">
+          Görev Başlığı <span className="text-red-500">*</span>
+        </Label>
+        <Input
+          id="title"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="Görev başlığı"
+          required
+          className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="description" className="text-white">
+          Açıklama
+        </Label>
+        <Textarea
+          id="description"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="Görev açıklaması"
+          rows={4}
+          className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500"
+        />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="status" className="text-white">
+            Durum
+          </Label>
+          <Select value={status} onValueChange={setStatus}>
+            <SelectTrigger id="status" className="bg-gray-800 border-gray-700 text-white">
+              <SelectValue placeholder="Durum seçin" />
+            </SelectTrigger>
+            <SelectContent className="bg-gray-800 border-gray-700 text-white">
+              <SelectItem value="todo">Yapılacak</SelectItem>
+              <SelectItem value="in_progress">Devam Ediyor</SelectItem>
+              <SelectItem value="done">Tamamlandı</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="priority" className="text-white">
+            Öncelik
+          </Label>
+          <Select value={priority} onValueChange={setPriority}>
+            <SelectTrigger id="priority" className="bg-gray-800 border-gray-700 text-white">
+              <SelectValue placeholder="Öncelik seçin" />
+            </SelectTrigger>
+            <SelectContent className="bg-gray-800 border-gray-700 text-white">
+              <SelectItem value="low" className="text-blue-400">
+                Düşük
+              </SelectItem>
+              <SelectItem value="medium" className="text-yellow-400">
+                Orta
+              </SelectItem>
+              <SelectItem value="high" className="text-red-400">
+                Yüksek
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="column" className="text-white">
+            Sütun
+          </Label>
+          <Select value={columnId} onValueChange={setColumnId}>
+            <SelectTrigger id="column" className="bg-gray-800 border-gray-700 text-white">
+              <SelectValue placeholder="Sütun seçin" />
+            </SelectTrigger>
+            <SelectContent className="bg-gray-800 border-gray-700 text-white">
+              {columns.map((column) => (
+                <SelectItem key={column.id} value={column.id.toString()}>
+                  {column.title}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="assignedUser" className="text-white">
+            Atanan Kişi
+          </Label>
+          <Select value={assignedUserId} onValueChange={setAssignedUserId}>
+            <SelectTrigger id="assignedUser" className="bg-gray-800 border-gray-700 text-white">
+              <SelectValue placeholder="Kullanıcı seçin" />
+            </SelectTrigger>
+            <SelectContent className="bg-gray-800 border-gray-700 text-white">
+              <SelectItem value="unassigned">Atanmamış</SelectItem>
+              {users.map((user) => (
+                <SelectItem key={user.id} value={user.id.toString()}>
+                  {user.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="tags" className="text-white">
+          Etiketler
+        </Label>
+        <Input
+          id="tags"
+          value={tags}
+          onChange={(e) => setTags(e.target.value)}
+          placeholder="Etiketleri virgülle ayırın (örn: frontend, bug, acil)"
+          className="bg-gray-800 border-gray-700 text-white placeholder:text-gray-500"
+        />
+      </div>
+    </form>
+  )
+}
