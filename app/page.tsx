@@ -6,17 +6,21 @@ import Link from "next/link"
 import { CreateBoardDialog } from "@/components/board/create-board-dialog"
 import { useToast } from "@/components/ui/use-toast"
 import { fetchBoards } from "@/lib/api"
+import { useAuth } from "@/components/auth/auth-provider"
 
 export default function HomePage() {
   const [boards, setBoards] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const { toast } = useToast()
+  const { user } = useAuth()
 
   useEffect(() => {
     const getBoards = async () => {
+      if (!user) return
+      
       try {
-        const data = await fetchBoards()
+        const data = await fetchBoards(user.id)
         setBoards(data)
       } catch (error) {
         toast({
@@ -30,7 +34,7 @@ export default function HomePage() {
     }
 
     getBoards()
-  }, [toast])
+  }, [toast, user])
 
   const handleBoardCreated = (newBoard) => {
     setBoards([...boards, newBoard])

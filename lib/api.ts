@@ -101,9 +101,9 @@ export async function getCurrentUserData() {
 }
 
 // Pano işlemleri (project_boards)
-export async function fetchBoards(): Promise<any[]> {
+export async function fetchBoards(userId: number): Promise<any[]> {
   const token = localStorage.getItem("token")
-  const response = await fetch(`${API_URL}/boards/`, {
+  const response = await fetch(`${API_URL}/boards/?user_id=${userId}`, {
     headers: { Authorization: `Bearer ${token}` },
   })
   if (!response.ok) throw new Error("Boardlar alınamadı")
@@ -119,7 +119,7 @@ export async function fetchBoard(boardId: number): Promise<any> {
   return response.json()
 }
 
-export async function createBoard(data: { name: string; user_id: number }): Promise<any> {
+export async function createBoard(data: { name: string; user_id: number; description?: string }): Promise<any> {
   const token = localStorage.getItem("token")
   const response = await fetch(`${API_URL}/boards/`, {
     method: "POST",
@@ -171,9 +171,9 @@ export async function fetchBoardMembers(board_id?: number, user_id?: number): Pr
   return response.json()
 }
 
-export async function addBoardMember(data: { board_id: number; user_id: number; role?: string }): Promise<any> {
+export async function requestBoardMembership(data: { board_id: number; email: string; inviter_id: number }): Promise<any> {
   const token = localStorage.getItem("token")
-  const response = await fetch(`${API_URL}/board-members/`, {
+  const response = await fetch(`${API_URL}/board-members/request`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -181,17 +181,29 @@ export async function addBoardMember(data: { board_id: number; user_id: number; 
     },
     body: JSON.stringify(data),
   })
-  if (!response.ok) throw new Error("Board üyesi eklenemedi")
+  if (!response.ok) throw new Error("Üyelik isteği gönderilemedi")
   return response.json()
 }
 
-export async function removeBoardMember(member_id: number): Promise<void> {
+export async function acceptBoardInvitation(notification_id: number): Promise<any> {
   const token = localStorage.getItem("token")
-  const response = await fetch(`${API_URL}/board-members/${member_id}`, {
+  const response = await fetch(`${API_URL}/board-members/accept-invitation/${notification_id}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+  if (!response.ok) throw new Error("Üyelik daveti kabul edilemedi")
+  return response.json()
+}
+
+export async function removeBoardMember(boardId: number, userId: number): Promise<void> {
+  const token = localStorage.getItem("token")
+  const response = await fetch(`${API_URL}/board-members/${userId}`, {
     method: "DELETE",
     headers: { Authorization: `Bearer ${token}` },
   })
-  if (!response.ok) throw new Error("Board üyesi silinemedi")
+  if (!response.ok) throw new Error("Üye silinemedi")
 }
 
 // Sütun işlemleri
@@ -357,13 +369,30 @@ export async function fetchUser(userId) {
 
 // Bildirim işlemleri
 export async function fetchNotifications(user_id?: number, is_read?: boolean): Promise<any[]> {
-  // Geçici olarak boş dizi döndür
-  return []
+  const token = localStorage.getItem("token")
+  let url = `${API_URL}/notifications/`
+  const params = []
+  if (user_id) params.push(`user_id=${user_id}`)
+  if (is_read !== undefined) params.push(`is_read=${is_read}`)
+  if (params.length) url += `?${params.join("&")}`
+  
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!response.ok) throw new Error("Bildirimler alınamadı")
+  return response.json()
 }
 
 export async function markNotificationAsRead(notification_id: number): Promise<any> {
-  // Geçici olarak başarılı döndür
-  return { success: true }
+  const token = localStorage.getItem("token")
+  const response = await fetch(`${API_URL}/notifications/${notification_id}/read`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+  if (!response.ok) throw new Error("Bildirim okundu olarak işaretlenemedi")
+  return response.json()
 }
 
 export async function markAllNotificationsAsRead(user_id: number): Promise<any[]> {

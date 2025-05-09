@@ -4,19 +4,20 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useToast } from "@/components/ui/use-toast"
-import { fetchBoardMembers, addBoardMember, removeBoardMember } from "@/lib/api"
+import { fetchBoardMembers, requestBoardMembership, removeBoardMember } from "@/lib/api"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Trash2 } from "lucide-react"
+import { Trash2, UserPlus } from "lucide-react"
 import { useAuth } from "@/components/auth/auth-provider"
 
-export function BoardMembersDialog({ open, onOpenChange, boardId }) {
-  const [members, setMembers] = useState([])
+export function BoardMembersDialog({ open, onOpenChange, boardId }: { open: boolean, onOpenChange: (v: boolean) => void, boardId: number }) {
+  const [members, setMembers] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [email, setEmail] = useState("")
   const [isAdding, setIsAdding] = useState(false)
   const [isRemoving, setIsRemoving] = useState(false)
+  const [showAddForm, setShowAddForm] = useState(false)
   const { toast } = useToast()
   const { user } = useAuth()
 
@@ -42,9 +43,8 @@ export function BoardMembersDialog({ open, onOpenChange, boardId }) {
     }
   }
 
-  const handleAddMember = async (e) => {
+  const handleAddMember = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-
     if (!email.trim()) {
       toast({
         title: "Hata",
@@ -53,21 +53,23 @@ export function BoardMembersDialog({ open, onOpenChange, boardId }) {
       })
       return
     }
-
     setIsAdding(true)
-
     try {
-      const newMember = await addBoardMember(boardId, email)
-      setMembers([...members, newMember])
+      await requestBoardMembership({
+        board_id: boardId,
+        email,
+        inviter_id: user?.id
+      })
       setEmail("")
+      setShowAddForm(false)
       toast({
         title: "Başarılı",
-        description: "Üye başarıyla eklendi.",
+        description: "Üyelik isteği başarıyla gönderildi.",
       })
     } catch (error) {
       toast({
         title: "Hata",
-        description: error.message || "Üye eklenirken bir hata oluştu.",
+        description: error.message || "Üyelik isteği gönderilemedi.",
         variant: "destructive",
       })
     } finally {
@@ -75,8 +77,8 @@ export function BoardMembersDialog({ open, onOpenChange, boardId }) {
     }
   }
 
-  const handleRemoveMember = async (memberId, userId) => {
-    if (userId === user.id) {
+  const handleRemoveMember = async (memberId: number, userId: number) => {
+    if (userId === user?.id) {
       toast({
         title: "Hata",
         description: "Kendinizi projeden çıkaramazsınız.",
@@ -109,23 +111,46 @@ export function BoardMembersDialog({ open, onOpenChange, boardId }) {
     }
   }
 
-  const isOwner = (member) => member.role === "owner"
-  const currentUserIsOwner = members.some((m) => m.user_id === user?.id && m.role === "owner")
+  const isOwner = (member: any) => member.role === "owner"
+  const currentUserIsOwner = members.some((m: any) => m.user_id === user?.id && m.role === "owner")
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px] bg-[#2d2d2d] border-gray-700 text-white">
-        <DialogHeader>
-          <DialogTitle>Proje Üyeleri</DialogTitle>
-          <DialogDescription className="text-gray-400">
-            Bu projenin üyelerini görüntüleyin ve yönetin.
-          </DialogDescription>
+        <DialogHeader className="flex flex-row items-center justify-between">
+          <div>
+            <DialogTitle>Proje Üyeleri</DialogTitle>
+            <DialogDescription className="text-gray-400">
+              Bu projenin üyelerini görüntüleyin ve yönetin.
+            </DialogDescription>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-gray-400 hover:text-white"
+            onClick={() => setShowAddForm((v) => !v)}
+            title="Üye Ekle"
+          >
+            <UserPlus className="h-5 w-5" />
+          </Button>
         </DialogHeader>
 
         {/* Üye Ekleme Formu */}
-        {currentUserIsOwner && (
+        {showAddForm && (
           <div className="mb-4">
-            <form onSubmit={handleAddMember} className="flex items-end gap-2">
+            <form onSubmit={e => {
+              e.preventDefault();
+              // Mevcut üyeye tekrar davet engeli
+              if (members.some(m => m.user?.email === email.trim())) {
+                toast({
+                  title: "Hata",
+                  description: "Bu e-posta zaten üye.",
+                  variant: "destructive",
+                });
+                return;
+              }
+              handleAddMember(e);
+            }} className="flex items-end gap-2">
               <div className="flex-1">
                 <Label htmlFor="email" className="text-sm text-gray-300">
                   E-posta ile üye ekle
@@ -176,21 +201,21 @@ export function BoardMembersDialog({ open, onOpenChange, boardId }) {
                     <AvatarFallback>{member.user?.name?.charAt(0) || "U"}</AvatarFallback>
                   </Avatar>
                   <div>
-                    <div className="font-medium flex items-center">
+                    <div className="font-medium flex items-center gap-2">
                       {member.user?.name}
-                      {isOwner(member) && (
-                        <span className="ml-2 text-xs bg-primary/20 text-primary px-2 py-0.5 rounded">Sahip</span>
-                      )}
+                      <span className={`ml-2 text-xs px-2 py-0.5 rounded ${member.role === "owner" ? "bg-primary/20 text-primary" : "bg-gray-700 text-gray-300"}`}>
+                        {member.role === "owner" ? "Sahip" : "Üye"}
+                      </span>
                     </div>
                     <div className="text-sm text-gray-400">{member.user?.email}</div>
                   </div>
                 </div>
-                {currentUserIsOwner && !isOwner(member) && (
+                {currentUserIsOwner && member.role !== "owner" && (
                   <Button
                     variant="ghost"
                     size="icon"
                     className="text-gray-400 hover:text-red-500 hover:bg-red-500/10"
-                    onClick={() => handleRemoveMember(member.id, member.user_id)}
+                    onClick={() => handleRemoveMember(member.id, member.user_id!)}
                     disabled={isRemoving}
                   >
                     <Trash2 className="h-4 w-4" />

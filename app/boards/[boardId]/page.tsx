@@ -3,13 +3,18 @@
 import { useEffect, useState } from "react"
 import { DragDropContext, Droppable, Draggable, DragResult } from "react-beautiful-dnd"
 import { Button } from "@/components/ui/button"
-import { PlusCircle } from "lucide-react"
+import { PlusCircle, UserPlus, Users } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import { ColumnList } from "@/components/column/column-list"
 import { CreateColumnDialog } from "@/components/column/create-column-dialog"
-import { fetchBoard, fetchColumns, updateTask, updateColumnPosition } from "@/lib/api"
+import { fetchBoard, fetchColumns, updateTask, updateColumnPosition, fetchBoardMembers, requestBoardMembership } from "@/lib/api"
 import { useAuth } from "@/components/auth/auth-provider"
 import { BoardHeader } from "@/components/board/board-header"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Separator } from "@/components/ui/separator"
 import { use } from "react"
 
 interface Task {
@@ -35,6 +40,19 @@ interface Board {
   created_at: string
 }
 
+interface BoardMember {
+  id: number
+  user_id: number
+  board_id: number
+  role: string
+  user: {
+    id: number
+    name: string
+    email: string
+    image?: string
+  }
+}
+
 interface PageProps {
   params: Promise<{
     boardId: string
@@ -45,6 +63,7 @@ export default function BoardPage({ params }: PageProps) {
   const { boardId } = use(params)
   const [board, setBoard] = useState<Board | null>(null)
   const [columns, setColumns] = useState<Column[]>([])
+  const [members, setMembers] = useState<BoardMember[]>([])
   const [filteredColumns, setFilteredColumns] = useState<Column[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isCreateColumnOpen, setIsCreateColumnOpen] = useState(false)
@@ -62,6 +81,9 @@ export default function BoardPage({ params }: PageProps) {
         setBoard(boardData)
         setColumns(columnsData)
         setFilteredColumns(columnsData)
+        
+        const membersData = await fetchBoardMembers(Number(boardId))
+        setMembers(membersData)
       } catch (error: any) {
         toast({
           title: "Hata",

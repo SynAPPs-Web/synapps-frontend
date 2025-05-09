@@ -5,19 +5,22 @@ import { Bell } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { fetchNotifications, markNotificationAsRead } from "@/lib/api"
+import { fetchNotifications, markNotificationAsRead, acceptBoardInvitation } from "@/lib/api"
 import { useToast } from "@/components/ui/use-toast"
+import { useAuth } from "@/components/auth/auth-provider"
 
 export function NotificationPopover() {
   const [notifications, setNotifications] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [unreadCount, setUnreadCount] = useState(0)
   const { toast } = useToast()
+  const { user } = useAuth()
 
   useEffect(() => {
     const getNotifications = async () => {
+      if (!user) return
       try {
-        const data = await fetchNotifications()
+        const data = await fetchNotifications(user.id)
         setNotifications(data)
         setUnreadCount(data.filter((n) => !n.is_read).length)
       } catch (error) {
@@ -28,7 +31,7 @@ export function NotificationPopover() {
     }
 
     getNotifications()
-  }, [])
+  }, [user])
 
   const handleMarkAsRead = async (notificationId) => {
     try {
@@ -43,6 +46,42 @@ export function NotificationPopover() {
       toast({
         title: "Hata",
         description: "Bildirim okundu olarak işaretlenirken bir hata oluştu.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleAcceptInvitation = async (notificationId) => {
+    try {
+      await acceptBoardInvitation(notificationId)
+      setNotifications(notifications.filter((n) => n.id !== notificationId))
+      setUnreadCount((prev) => Math.max(0, prev - 1))
+      toast({
+        title: "Başarılı",
+        description: "Davet kabul edildi. Board'a üye oldunuz.",
+      })
+    } catch (error) {
+      toast({
+        title: "Hata",
+        description: "Davet kabul edilirken bir hata oluştu.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleRejectInvitation = async (notificationId) => {
+    try {
+      await markNotificationAsRead(notificationId)
+      setNotifications(notifications.filter((n) => n.id !== notificationId))
+      setUnreadCount((prev) => Math.max(0, prev - 1))
+      toast({
+        title: "Reddedildi",
+        description: "Davet reddedildi.",
+      })
+    } catch (error) {
+      toast({
+        title: "Hata",
+        description: "Davet reddedilirken bir hata oluştu.",
         variant: "destructive",
       })
     }
@@ -90,21 +129,37 @@ export function NotificationPopover() {
           ) : (
             <div className="grid gap-1 p-1">
               {notifications.map((notification) => (
-                <button
-                  key={notification.id}
-                  className={`flex items-start gap-3 rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-gray-700 ${
-                    !notification.is_read ? "bg-gray-700/50" : ""
-                  }`}
-                  onClick={() => handleMarkAsRead(notification.id)}
-                >
-                  <div
-                    className={`mt-1 h-2 w-2 rounded-full ${!notification.is_read ? "bg-red-500" : "bg-transparent"}`}
-                  />
-                  <div className="grid gap-1">
-                    <div className="font-medium text-white">{notification.message}</div>
-                    <div className="text-xs text-gray-400">{new Date(notification.created_at).toLocaleString()}</div>
+                <div key={notification.id} className={`flex flex-col gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors hover:bg-gray-700 ${!notification.is_read ? "bg-gray-700/50" : ""}`}>
+                  <div className="flex items-start gap-3">
+                    <div className={`mt-1 h-2 w-2 rounded-full ${!notification.is_read ? "bg-red-500" : "bg-transparent"}`} />
+                    <div className="grid gap-1 flex-1">
+                      {/* Board daveti için özel mesaj ve butonlar */}
+                      {notification.notification_type === "board_invitation" ? (
+                        <>
+                          <div className="font-medium text-white">
+                            {notification.data?.board_name
+                              ? `Bir board daveti: '${notification.data.board_name}'`
+                              : notification.message}
+                          </div>
+                          <div className="text-xs text-gray-400">{new Date(notification.created_at).toLocaleString()}</div>
+                          <div className="flex gap-2 mt-1">
+                            <Button size="sm" variant="default" onClick={() => handleAcceptInvitation(notification.id)}>
+                              Kabul Et
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => handleRejectInvitation(notification.id)}>
+                              Reddet
+                            </Button>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="font-medium text-white">{notification.message}</div>
+                          <div className="text-xs text-gray-400">{new Date(notification.created_at).toLocaleString()}</div>
+                        </>
+                      )}
+                    </div>
                   </div>
-                </button>
+                </div>
               ))}
             </div>
           )}
