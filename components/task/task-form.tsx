@@ -8,20 +8,38 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { fetchUsers, fetchColumns, fetchBoardMembers } from "@/lib/api"
 import { useToast } from "@/components/ui/use-toast"
 
-export function TaskForm({ task, onSubmit, isSubmitting, boardId }) {
+interface TaskFormProps {
+  task?: {
+    title?: string;
+    description?: string;
+    priority?: string;
+    assigned_user_id?: number;
+  };
+  onSubmit: (data: {
+    title: string;
+    description: string;
+    priority: string;
+    assigned_user_id: number | null;
+  }) => void;
+  isSubmitting: boolean;
+  boardId: number;
+}
+
+export function TaskForm({ task, onSubmit, isSubmitting, boardId }: TaskFormProps): React.ReactElement {
   const [title, setTitle] = useState(task?.title || "")
   const [description, setDescription] = useState(task?.description || "")
   const [priority, setPriority] = useState(task?.priority || "medium")
   const [assignedUserId, setAssignedUserId] = useState(task?.assigned_user_id?.toString() || "")
-  const [users, setUsers] = useState([])
+  const [users, setUsers] = useState<Array<{ id: number; name: string }>>([])
   const [isLoading, setIsLoading] = useState(true)
   const { toast } = useToast()
 
   useEffect(() => {
-    const loadFormData = async () => {
+    if (!boardId) return;
+    const loadUsers = async () => {
       try {
-        const membersData = await fetchBoardMembers(boardId)
-        setUsers(membersData.map(m => m.user))
+        const usersData = await fetchBoardMembers(boardId)
+        setUsers(usersData.map(m => m.user))
       } catch (error) {
         toast({
           title: "Hata",
@@ -32,10 +50,18 @@ export function TaskForm({ task, onSubmit, isSubmitting, boardId }) {
         setIsLoading(false)
       }
     }
-    loadFormData()
-  }, [toast, boardId])
+    loadUsers()
+  }, [boardId])
 
-  const handleSubmit = (e) => {
+  useEffect(() => {
+    if (task?.assigned_user_id) {
+      setAssignedUserId(task.assigned_user_id.toString());
+    } else {
+      setAssignedUserId("");
+    }
+  }, [task]);
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>): void => {
     e.preventDefault()
     if (!title.trim()) {
       toast({
@@ -123,7 +149,7 @@ export function TaskForm({ task, onSubmit, isSubmitting, boardId }) {
             <SelectContent className="bg-gray-800 border-gray-700 text-white">
               <SelectItem value="unassigned">Atanmamış</SelectItem>
               {users.map((user) => (
-                <SelectItem key={user.id} value={user.id.toString()}>
+                <SelectItem key={user.id.toString()} value={user.id.toString()}>
                   {user.name}
                 </SelectItem>
               ))}

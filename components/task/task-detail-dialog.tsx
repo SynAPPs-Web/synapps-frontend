@@ -4,16 +4,25 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog"
 import { useToast } from "@/components/ui/use-toast"
-import { fetchTask, updateTask, deleteTask } from "@/lib/api"
+import { fetchTask, updateTask, deleteTask, fetchColumns } from "@/lib/api"
 import { TaskForm } from "@/components/task/task-form"
 import { Trash } from "lucide-react"
 
-export function TaskDetailDialog({ open, onOpenChange, taskId, onTaskUpdated, onTaskDeleted }) {
-  const [task, setTask] = useState(null)
+interface TaskDetailDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  taskId: number;
+  onTaskUpdated: (task: any) => void;
+  onTaskDeleted: (taskId: number) => void;
+}
+
+export function TaskDetailDialog({ open, onOpenChange, taskId, onTaskUpdated, onTaskDeleted }: TaskDetailDialogProps) {
+  const [task, setTask] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const { toast } = useToast()
+  const [boardId, setBoardId] = useState<number | null>(null);
 
   useEffect(() => {
     if (open && taskId) {
@@ -21,15 +30,26 @@ export function TaskDetailDialog({ open, onOpenChange, taskId, onTaskUpdated, on
     }
   }, [open, taskId])
 
-  const loadTask = async () => {
+  useEffect(() => {
+    const getBoardId = async () => {
+      if (task && task.column_id) {
+        const columns = await fetchColumns(undefined); // Tüm kolonları çek
+        const column = columns.find((col: any) => col.id === task.column_id);
+        if (column) setBoardId(column.board_id);
+      }
+    };
+    getBoardId();
+  }, [task]);
+
+  const loadTask = async (): Promise<void> => {
     setIsLoading(true)
     try {
       const taskData = await fetchTask(taskId)
       setTask(taskData)
-    } catch (error) {
+    } catch (error: unknown) {
       toast({
         title: "Hata",
-        description: error.message || "Görev bilgileri yüklenirken bir hata oluştu.",
+        description: error instanceof Error ? error.message : "Görev bilgileri yüklenirken bir hata oluştu.",
         variant: "destructive",
       })
       onOpenChange(false)
@@ -38,7 +58,7 @@ export function TaskDetailDialog({ open, onOpenChange, taskId, onTaskUpdated, on
     }
   }
 
-  const handleSave = async (updatedTaskData) => {
+  const handleSave = async (updatedTaskData: any): Promise<void> => {
     setIsSaving(true)
     try {
       const updatedTask = await updateTask(taskId, updatedTaskData)
@@ -49,10 +69,10 @@ export function TaskDetailDialog({ open, onOpenChange, taskId, onTaskUpdated, on
       })
       onTaskUpdated(updatedTask)
       onOpenChange(false)
-    } catch (error) {
+    } catch (error: unknown) {
       toast({
         title: "Hata",
-        description: error.message || "Görev güncellenirken bir hata oluştu.",
+        description: error instanceof Error ? error.message : "Görev güncellenirken bir hata oluştu.",
         variant: "destructive",
       })
     } finally {
@@ -60,7 +80,7 @@ export function TaskDetailDialog({ open, onOpenChange, taskId, onTaskUpdated, on
     }
   }
 
-  const handleDelete = async () => {
+  const handleDelete = async (): Promise<void> => {
     if (!confirm("Bu görevi silmek istediğinizden emin misiniz?")) {
       return
     }
@@ -74,10 +94,10 @@ export function TaskDetailDialog({ open, onOpenChange, taskId, onTaskUpdated, on
       })
       onTaskDeleted(taskId)
       onOpenChange(false)
-    } catch (error) {
+    } catch (error: unknown) {
       toast({
         title: "Hata",
-        description: error.message || "Görev silinirken bir hata oluştu.",
+        description: error instanceof Error ? error.message : "Görev silinirken bir hata oluştu.",
         variant: "destructive",
       })
     } finally {
@@ -93,6 +113,8 @@ export function TaskDetailDialog({ open, onOpenChange, taskId, onTaskUpdated, on
           <DialogDescription>Bu görevle ilgili detayları görüntüleyin ve düzenleyin.</DialogDescription>
         </DialogHeader>
 
+        {console.log("Task:", task)}
+        {console.log("TaskForm boardId:", task?.board_id)}
         {isLoading ? (
           <div className="animate-pulse space-y-4">
             <div className="h-10 bg-gray-700 rounded-md"></div>
@@ -103,7 +125,11 @@ export function TaskDetailDialog({ open, onOpenChange, taskId, onTaskUpdated, on
             </div>
           </div>
         ) : (
-          <TaskForm task={task} onSubmit={handleSave} isSubmitting={isSaving} />
+          task && boardId ? (
+            <TaskForm key={task.id} task={task} onSubmit={handleSave} isSubmitting={isSaving} boardId={boardId} />
+          ) : (
+            <div className="text-red-500 p-4">Görev verisi yüklenemedi.</div>
+          )
         )}
 
         <DialogFooter className="flex justify-between">

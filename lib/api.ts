@@ -168,7 +168,12 @@ export async function fetchBoardMembers(board_id?: number, user_id?: number): Pr
     headers: { Authorization: `Bearer ${token}` },
   })
   if (!response.ok) throw new Error("Board üyeleri alınamadı")
-  return response.json()
+  const data = await response.json()
+  // Eğer board_id verilmişse, sadece o board'a ait üyeleri döndür
+  if (board_id) {
+    return data.filter((member: any) => member.board_id === board_id)
+  }
+  return data
 }
 
 export async function requestBoardMembership(data: { board_id: number; email: string; inviter_id: number }): Promise<any> {
@@ -207,9 +212,13 @@ export async function removeBoardMember(boardId: number, userId: number): Promis
 }
 
 // Sütun işlemleri
-export async function fetchColumns(boardId: number): Promise<any[]> {
+export async function fetchColumns(boardId?: number): Promise<any[]> {
   const token = localStorage.getItem("token")
-  const response = await fetch(`${API_URL}/columns/?board_id=${boardId}`, {
+  let url = `${API_URL}/columns/`
+  if (boardId !== undefined) {
+    url += `?board_id=${boardId}`
+  }
+  const response = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
   })
   if (!response.ok) throw new Error("Kolonlar alınamadı")
