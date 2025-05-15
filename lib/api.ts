@@ -316,7 +316,10 @@ export async function updateTask(taskId: number, data: any): Promise<any> {
     },
     body: JSON.stringify(data),
   })
-  if (!response.ok) throw new Error("Görev güncellenemedi")
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.detail || "Görev güncellenemedi")
+  }
   return response.json()
 }
 

@@ -42,7 +42,7 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#1e2024] p-8">
+    <div className="min-h-screen bg-sidebar-background p-8">
       <div className="max-w-7xl mx-auto">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold text-white">Projeler</h1>

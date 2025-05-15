@@ -5,6 +5,7 @@ import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/toaster"
 import { Header } from "@/components/layout/header"
 import { AuthProvider } from "@/components/auth/auth-provider"
+import { Sidebar } from "@/components/layout/sidebar"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -20,7 +21,10 @@ export default function RootLayout({
           <AuthProvider>
             <div className="flex min-h-screen flex-col">
               <Header />
-              <main className="flex-1">{children}</main>
+              <div className="flex flex-1 flex-row">
+                <Sidebar />
+                <main className="flex-1">{children}</main>
+              </div>
             </div>
             <Toaster />
           </AuthProvider>

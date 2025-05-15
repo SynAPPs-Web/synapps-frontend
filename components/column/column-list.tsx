@@ -6,10 +6,10 @@ import { Button } from "@/components/ui/button"
 import { PlusCircle } from "lucide-react"
 import { CreateTaskDialog } from "@/components/task/create-task-dialog"
 import { TaskDetailDialog } from "@/components/task/task-detail-dialog"
-import { Draggable } from "react-beautiful-dnd"
+import { Draggable } from "@hello-pangea/dnd"
 import { useToast } from "@/components/ui/use-toast"
 
-export function ColumnList({ column }) {
+export function ColumnList({ column, members = [] }) {
   const [isCreateTaskOpen, setIsCreateTaskOpen] = useState(false)
   const [selectedTaskId, setSelectedTaskId] = useState(null)
   const [isTaskDetailOpen, setIsTaskDetailOpen] = useState(false)
@@ -54,21 +54,30 @@ export function ColumnList({ column }) {
 
   return (
     <div className="space-y-2">
-      {tasks.map((task, index) => (
-        <Draggable key={task.id} draggableId={task.id.toString()} index={index}>
-          {(provided, snapshot) => (
-            <div
-              ref={provided.innerRef}
-              {...provided.draggableProps}
-              {...provided.dragHandleProps}
-              className={`${snapshot.isDragging ? "opacity-70" : ""}`}
-              onClick={() => handleTaskClick(task.id)}
-            >
-              <TaskCard task={task} />
-            </div>
-          )}
-        </Draggable>
-      ))}
+      {tasks.map((task, index) => {
+        // Atanan kullanıcıyı bul
+        const assignedMember = members.find(m => m.user_id === task.assigned_user_id);
+        // TaskCard'a assignee olarak ekle
+        const taskWithAssignee = {
+          ...task,
+          assignee: assignedMember ? { name: assignedMember.user?.name || "" } : undefined,
+        };
+        return (
+          <Draggable key={task.id} draggableId={task.id.toString()} index={index}>
+            {(provided, snapshot) => (
+              <div
+                ref={provided.innerRef}
+                {...provided.draggableProps}
+                {...provided.dragHandleProps}
+                className={`${snapshot.isDragging ? "opacity-70" : ""}`}
+                onClick={() => handleTaskClick(task.id)}
+              >
+                <TaskCard task={taskWithAssignee} />
+              </div>
+            )}
+          </Draggable>
+        );
+      })}
 
       {tasks.length === 0 && (
         <div className="flex h-20 items-center justify-center rounded-md border border-dashed border-gray-600 p-2 text-center text-sm text-gray-400">

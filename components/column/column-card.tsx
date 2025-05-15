@@ -1,6 +1,6 @@
 "use client"
 
-import { Draggable } from "react-beautiful-dnd"
+import { Draggable } from "@hello-pangea/dnd"
 import { TaskCard } from "@/components/task/task-card"
 
 export function ColumnCard({ column }) {

@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/components/ui/use-toast"
-import { createTask, fetchUsers } from "@/lib/api"
+import { createTask, fetchBoardMembers } from "@/lib/api"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 export function CreateTaskDialog({ open, onOpenChange, columnId, boardId, onTaskCreated }) {
@@ -31,22 +31,20 @@ export function CreateTaskDialog({ open, onOpenChange, columnId, boardId, onTask
       // Kullanıcıları yükle
       const loadUsers = async () => {
         try {
-          const usersData = await fetchUsers()
-          setUsers(usersData)
+          const usersData = await fetchBoardMembers(boardId)
+          setUsers(usersData.map(m => m.user))
         } catch (error) {
           console.error("Kullanıcılar yüklenirken hata:", error)
         }
       }
-
       loadUsers()
-
       // Form alanlarını sıfırla
       setTitle("")
       setDescription("")
       setPriority("medium")
       setAssignedUserId("")
     }
-  }, [open])
+  }, [open, boardId])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -68,6 +66,7 @@ export function CreateTaskDialog({ open, onOpenChange, columnId, boardId, onTask
         description,
         column_id: columnId,
         status: "todo",
+        priority,
       };
       if (assignedUserId && assignedUserId !== "unassigned") {
         payload.assigned_user_id = Number(assignedUserId);

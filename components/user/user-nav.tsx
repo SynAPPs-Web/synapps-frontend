@@ -60,17 +60,6 @@ export function UserNav() {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator className="bg-gray-700" />
-        <DropdownMenuGroup>
-          <DropdownMenuItem className="text-gray-200 focus:bg-gray-700 focus:text-white">
-            <User className="mr-2 h-4 w-4" />
-            <span>Profil</span>
-          </DropdownMenuItem>
-          <DropdownMenuItem className="text-gray-200 focus:bg-gray-700 focus:text-white">
-            <Settings className="mr-2 h-4 w-4" />
-            <span>Ayarlar</span>
-          </DropdownMenuItem>
-        </DropdownMenuGroup>
-        <DropdownMenuSeparator className="bg-gray-700" />
         <DropdownMenuItem className="text-gray-200 focus:bg-gray-700 focus:text-white" onClick={handleLogout}>
           <LogOut className="mr-2 h-4 w-4" />
           <span>Çıkış Yap</span>

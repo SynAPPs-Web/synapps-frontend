@@ -70,10 +70,10 @@ export function NotificationPopover() {
   }
 
   const handleRejectInvitation = async (notificationId) => {
+    setNotifications((prev) => prev.filter((n) => n.id !== notificationId))
+    setUnreadCount((prev) => Math.max(0, prev - 1))
     try {
       await markNotificationAsRead(notificationId)
-      setNotifications(notifications.filter((n) => n.id !== notificationId))
-      setUnreadCount((prev) => Math.max(0, prev - 1))
       toast({
         title: "Reddedildi",
         description: "Davet reddedildi.",
@@ -103,11 +103,6 @@ export function NotificationPopover() {
       <PopoverContent className="w-80 p-0 bg-[#2d2d2d] border-gray-700" align="end">
         <div className="flex items-center justify-between border-b border-gray-700 px-4 py-2">
           <h4 className="font-medium text-white">Bildirimler</h4>
-          {unreadCount > 0 && (
-            <Button variant="ghost" size="sm" className="h-auto px-2 text-xs text-gray-400 hover:text-white">
-              Tümünü Okundu İşaretle
-            </Button>
-          )}
         </div>
         <ScrollArea className="h-80">
           {isLoading ? (

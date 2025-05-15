@@ -1,9 +1,9 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { DragDropContext, Droppable, Draggable, DragResult } from "react-beautiful-dnd"
+import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd"
 import { Button } from "@/components/ui/button"
-import { PlusCircle, UserPlus, Users } from "lucide-react"
+import { PlusCircle, UserPlus, Users, MoreHorizontal } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import { ColumnList } from "@/components/column/column-list"
 import { CreateColumnDialog } from "@/components/column/create-column-dialog"
@@ -16,6 +16,7 @@ import { Label } from "@/components/ui/label"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import { use } from "react"
+import { EditColumnDialog } from "@/components/column/edit-column-dialog"
 
 interface Task {
   id: number
@@ -23,6 +24,8 @@ interface Task {
   description?: string
   status?: string
   assigned_user_id?: number
+  position: number
+  column_id: number
 }
 
 interface Column {
@@ -69,6 +72,7 @@ export default function BoardPage({ params }: PageProps) {
   const [isCreateColumnOpen, setIsCreateColumnOpen] = useState(false)
   const { toast } = useToast()
   const { user } = useAuth()
+  const [editingColumn, setEditingColumn] = useState<Column | null>(null)
 
   useEffect(() => {
     const loadBoardData = async () => {
@@ -98,105 +102,123 @@ export default function BoardPage({ params }: PageProps) {
     loadBoardData()
   }, [boardId, toast])
 
-  const handleDragEnd = async (result: DragResult) => {
-    const { destination, source, draggableId, type } = result
+  const handleDragEnd = async (result: DropResult) => {
+    const { destination, source, draggableId, type } = result;
+    if (!destination) return;
+    if (destination.droppableId === source.droppableId && destination.index === source.index) return;
 
-    // Sürükleme işlemi tamamlanmadıysa
-    if (!destination) return
-
-    // Aynı yere bırakıldıysa
-    if (destination.droppableId === source.droppableId && destination.index === source.index) {
-      return
-    }
-
-    // Sütun sürükleme
     if (type === "column") {
-      const newColumns = Array.from(columns)
-      const movedColumn = newColumns.find((col) => col.id.toString() === draggableId)
-
-      if (!movedColumn) return
-
-      // Sütunu listeden çıkar
-      const newColumnOrder = newColumns.filter((col) => col.id.toString() !== draggableId)
-
-      // Sütunu yeni pozisyona ekle
-      newColumnOrder.splice(destination.index, 0, movedColumn)
-
-      // Pozisyonları güncelle
-      const updatedColumns = newColumnOrder.map((col, index) => ({
-        ...col,
-        position: index,
-      }))
-
-      setColumns(updatedColumns)
-      setFilteredColumns(updatedColumns)
-
-      try {
-        // API'ye güncelleme gönder
-        await updateColumnPosition(draggableId, destination.index)
-      } catch (error: any) {
-        toast({
-          title: "Hata",
-          description: "Sütun taşınırken bir hata oluştu.",
-          variant: "destructive",
-        })
-
-        // Hata durumunda orijinal verileri yeniden yükle
-        const columnsData = await fetchColumns(Number(boardId))
-        setColumns(columnsData)
-        setFilteredColumns(columnsData)
+      const newColumns = Array.from(columns);
+      const [removed] = newColumns.splice(source.index, 1);
+      newColumns.splice(destination.index, 0, removed);
+      
+      // Tüm sütunların pozisyonunu güncelle
+      const updatedColumns = newColumns.map((col, idx) => ({ ...col, position: idx }));
+      setColumns(updatedColumns);
+      setFilteredColumns(updatedColumns);
+      
+      // Sütunları sırayla güncelle
+      for (const col of updatedColumns) {
+        try {
+          await updateColumnPosition(col.id, col.position);
+        } catch (error) {
+          console.error("Sütun pozisyonu güncellenirken hata:", error);
+        }
       }
+    } else if (type === "task") {
+      const sourceColIdx = columns.findIndex(col => col.id.toString() === source.droppableId);
+      const destColIdx = columns.findIndex(col => col.id.toString() === destination.droppableId);
+      if (sourceColIdx === -1 || destColIdx === -1) return;
 
-      return
+      const sourceCol = columns[sourceColIdx];
+      const destCol = columns[destColIdx];
+      const sourceTasks = Array.from(sourceCol.tasks);
+      const [movedTask] = sourceTasks.splice(source.index, 1);
+
+      if (sourceCol.id === destCol.id) {
+        // Aynı sütun içinde sıralama değişti
+        sourceTasks.splice(destination.index, 0, movedTask);
+        const updatedTasks = sourceTasks.map((task, idx) => ({ ...task, position: idx }));
+        const updatedColumns = columns.map((col, idx) =>
+          idx === sourceColIdx ? { ...col, tasks: updatedTasks } : col
+        );
+        setColumns(updatedColumns);
+        setFilteredColumns(updatedColumns);
+        
+        // Görevleri sırayla güncelle
+        for (const task of updatedTasks) {
+          try {
+            await updateTask(task.id, { position: task.position, column_id: task.column_id });
+          } catch (error) {
+            console.error("Görev pozisyonu güncellenirken hata:", error);
+          }
+        }
+      } else {
+        // Farklı sütuna taşındı
+        const destTasks = Array.from(destCol.tasks);
+        destTasks.splice(destination.index, 0, { ...movedTask, column_id: destCol.id });
+        
+        const updatedSourceTasks = sourceTasks.map((task, idx) => ({ ...task, position: idx }));
+        const updatedDestTasks = destTasks.map((task, idx) => ({ ...task, position: idx }));
+        
+        const updatedColumns = columns.map((col, idx) => {
+          if (idx === sourceColIdx) return { ...col, tasks: updatedSourceTasks };
+          if (idx === destColIdx) return { ...col, tasks: updatedDestTasks };
+          return col;
+        });
+        
+        setColumns(updatedColumns);
+        setFilteredColumns(updatedColumns);
+        
+        // Görevleri sırayla güncelle
+        for (const task of updatedSourceTasks) {
+          try {
+            await updateTask(task.id, { position: task.position, column_id: task.column_id });
+          } catch (error) {
+            console.error("Görev pozisyonu güncellenirken hata:", error);
+          }
+        }
+        
+        for (const task of updatedDestTasks) {
+          try {
+            await updateTask(task.id, { position: task.position, column_id: task.column_id });
+          } catch (error) {
+            console.error("Görev pozisyonu güncellenirken hata:", error);
+          }
+        }
+      }
     }
+  };
 
-    // Görev sürükleme
-    try {
-      // Optimistik UI güncellemesi
-      const updatedColumns = [...columns]
-
-      // Kaynak sütundan görevi kaldır
-      const sourceColumn = updatedColumns.find((col) => col.id.toString() === source.droppableId)
-      if (!sourceColumn) return
-      const taskToMove = sourceColumn.tasks[source.index]
-      sourceColumn.tasks.splice(source.index, 1)
-
-      // Hedef sütuna görevi ekle
-      const destColumn = updatedColumns.find((col) => col.id.toString() === destination.droppableId)
-      if (!destColumn) return
-      destColumn.tasks.splice(destination.index, 0, taskToMove)
-
-      setColumns(updatedColumns)
-      setFilteredColumns(updatedColumns)
-
-      // API'ye güncelleme gönder
-      await updateTask(Number(draggableId), {
-        column_id: Number(destination.droppableId),
-      })
-    } catch (error: any) {
-      toast({
-        title: "Hata",
-        description: "Görev taşınırken bir hata oluştu.",
-        variant: "destructive",
-      })
-
-      // Hata durumunda orijinal verileri yeniden yükle
-      const columnsData = await fetchColumns(Number(boardId))
-      setColumns(columnsData)
-      setFilteredColumns(columnsData)
-    }
-  }
-
-  const handleColumnCreated = (newColumn: Column) => {
-    const columnWithTasks = { ...newColumn, tasks: [] }
-    const updatedColumns = [...columns, columnWithTasks]
-    setColumns(updatedColumns)
-    setFilteredColumns(updatedColumns)
-    setIsCreateColumnOpen(false)
-  }
+  const handleColumnCreated = async (newColumn: Column) => {
+    // Yeni sütunu mevcut sütunlar listesine ekle
+    setColumns((prevColumns) => [...prevColumns, newColumn]);
+    setIsCreateColumnOpen(false);
+  };
 
   const handleBoardUpdated = (updatedBoard: Board) => {
     setBoard(updatedBoard)
+  }
+
+  const handleColumnUpdated = (updatedColumn: Column) => {
+    setColumns((prevColumns) =>
+      prevColumns.map((col) =>
+        col.id === updatedColumn.id ? { ...col, ...updatedColumn } : col
+      )
+    );
+    setFilteredColumns((prevColumns) =>
+      prevColumns.map((col) =>
+        col.id === updatedColumn.id ? { ...col, ...updatedColumn } : col
+      )
+    );
+    setEditingColumn((prev) =>
+      prev && prev.id === updatedColumn.id ? { ...prev, ...updatedColumn } : prev
+    );
+  };
+
+  const handleColumnDeleted = (columnId: number) => {
+    setColumns((prevColumns) => prevColumns.filter((col) => col.id !== columnId))
+    setFilteredColumns((prevColumns) => prevColumns.filter((col) => col.id !== columnId))
   }
 
   if (isLoading) {
@@ -230,15 +252,16 @@ export default function BoardPage({ params }: PageProps) {
           >
             {(provided) => (
               <div className="flex space-x-4 h-full" ref={provided.innerRef} {...provided.droppableProps}>
-                {filteredColumns.map((column, index) => (
+                {columns.map((column, index) => (
                   <Draggable key={column.id} draggableId={column.id.toString()} index={index}>
                     {(provided, snapshot) => (
                       <div
                         ref={provided.innerRef}
                         {...provided.draggableProps}
+                        {...provided.dragHandleProps}
                         className={`w-80 flex-shrink-0 ${snapshot.isDragging ? "opacity-70" : ""}`}
                       >
-                        <div className="mb-2 flex items-center justify-between" {...provided.dragHandleProps}>
+                        <div className="mb-2 flex items-center justify-between">
                           <h3 className="font-medium text-white">
                             {column.title}
                             {column.tasks?.length > 0 && (
@@ -249,9 +272,9 @@ export default function BoardPage({ params }: PageProps) {
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8 text-gray-400 hover:text-white"
-                            onClick={() => setIsCreateColumnOpen(true)}
+                            onClick={() => setEditingColumn(column)}
                           >
-                            <PlusCircle className="h-4 w-4" />
+                            <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </div>
                         <Droppable 
@@ -269,7 +292,7 @@ export default function BoardPage({ params }: PageProps) {
                                 snapshot.isDraggingOver ? "bg-gray-600/50" : ""
                               }`}
                             >
-                              <ColumnList column={column} />
+                              <ColumnList column={column} members={members} />
                               {provided.placeholder}
                             </div>
                           )}
@@ -303,6 +326,18 @@ export default function BoardPage({ params }: PageProps) {
         boardId={boardId}
         onColumnCreated={handleColumnCreated}
       />
+
+      {editingColumn && (
+        <EditColumnDialog
+          open={!!editingColumn}
+          onOpenChange={(open) => {
+            if (!open) setEditingColumn(null);
+          }}
+          column={editingColumn}
+          onColumnUpdated={handleColumnUpdated}
+          onColumnDeleted={handleColumnDeleted}
+        />
+      )}
     </div>
   )
 }

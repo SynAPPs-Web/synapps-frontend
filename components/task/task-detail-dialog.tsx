@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog"
 import { useToast } from "@/components/ui/use-toast"
 import { fetchTask, updateTask, deleteTask } from "@/lib/api"
 import { TaskForm } from "@/components/task/task-form"
@@ -90,6 +90,7 @@ export function TaskDetailDialog({ open, onOpenChange, taskId, onTaskUpdated, on
       <DialogContent className="sm:max-w-[600px] bg-[#2d2d2d] border-gray-700 text-white">
         <DialogHeader>
           <DialogTitle>Görev Detayları</DialogTitle>
+          <DialogDescription>Bu görevle ilgili detayları görüntüleyin ve düzenleyin.</DialogDescription>
         </DialogHeader>
 
         {isLoading ? (
